@@ -66,9 +66,9 @@ int qd_open(qnx_disk *qd, char *path, uint32_t ioff)
 int qd_read_sector(qnx_disk *qd, uint32_t sn, void *buf)
 {
 	uint8_t *dbuf=(uint8_t *)buf;
-	int br=Q_BLOCKSIZE;
-	int roff=qd->ioff+Q_BLOCKSIZE*sn;
-	int rr;
+	uint32_t br=Q_BLOCKSIZE;
+	uint32_t roff=qd->ioff+Q_BLOCKSIZE*sn;
+	int32_t rr;
 	if(roff+Q_BLOCKSIZE > qd->isize)
 		func_abort("Trying to read beyond end of image (sector %u, offset %u)",sn,roff);
 	if(lseek(qd->fd,roff,SEEK_SET)!=roff)
@@ -271,24 +271,24 @@ int32_t qnx_filesize(qnx_disk *qd, struct q_dir_entry *de)
 /* open helper */
 int qnx_de2fd(qnx_disk *qd,struct q_dir_entry *de,qnx_file *fd)
 {
-	struct q_xtnt_header h;
+	int32_t fsize;
+
+	fsize = qnx_filesize(qd,de);
+	if(fsize<0)
+		func_abort("filesize error for %s\n",de->fname);
+
 	memset(fd,0,sizeof(qnx_file));
-
-	
-
-	fd->qd=qd;
-	fd->attrs=de->fattr;
+	fd->qd = qd;
+	fd->attrs = de->fattr;
+	fd->firstx = de->ffirst_xtnt;
+	fd->fsize = fsize;
 	/* commented fd->fsize line below would probably work on QNX 2.x */
 /*	fd->fsize=(1+de->fnum_blks)*Q_BLOCKSIZE - de->fnum_chars_free; */
-	if(qnx_read_xh(qd,de->ffirst_xtnt,&h))
-	{
-		func_abort("failed to read extent");
-	}
-	fd->firstx = de->ffirst_xtnt;
-	fd->crtx = de->ffirst_xtnt;
-	fd->nxtx = h.next_xtnt;
-	fd->xsize = h.size_xtnt;
-	fd->fsize = qnx_filesize(qd,de);	/* TODO: check error status */
+	
+	/* set extent variables in our struct */
+	if(qnx_set_fd_xtnt(fd, de->ffirst_xtnt))
+		func_abort("unable to read first extent");
+
 	return 0;
 }
 
@@ -332,7 +332,7 @@ int qnx_search_dir(qnx_file *fd, char *name, struct q_dir_entry *dde)
 	return 1;
 }
 
-/* open file from path */
+/* open file from (absolute) path */
 int q_open_file(qnx_disk *qd, char *path, qnx_file *fd)
 {
 	char *tp;

@@ -18,16 +18,18 @@ Usage:
     -o  Offset (in bytes) into image file (e.g. for partition)
     -l  Local destination for -x (file(s) extracted to local_path)
 
-Notes:
-     if multiple -r/d/x options are given, only last one is used
-     option -a affects all files (binary ones would be mangled!)
-
+Note:
 Since QNX uses a different character for newline (0x1e - RS) instead of the
 usual ones (0x0a - LF and/or 0x0d - CR), to easily read text files -a converts
 all instances of RS to LF. While this is convenient for viewing text files, it
 is not desired in binary files. If extracting multiple files avoid -a option
 and later use tr to convert:
 cat <file> | tr '\036' '\012'
+
+Known bugs/limitations
+ - If multiple -r/d/x options are given, only last one is used
+ - Option -a affects all files (binary ones would be mangled!)
+ - (probably) Doesn't work correctly with deleted files or files with 0 length
 
 To read hdd images, first determine QNX partition start using another tool
 (e.g. fdisk -l). Since usually the partition start is given in sectors,
