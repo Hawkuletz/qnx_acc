@@ -112,12 +112,29 @@ void disp_main_header(struct load_hdr_record *h)
 	printf("Code_spare:\t%04x (%u)\n",h->Code_spare,h->Code_spare);
 }
 
-uint32_t disp_record_header(struct load_data_record *rh)
+/* TODO: bounds checking */
+uint32_t load_record_header(struct load_data_record *rh,char *cs, char *ds)
 {
+	char *dst=NULL;
 	printf("Load type:\t%02x\n",rh->Load_type);
-	printf("Offset:\t%04x\n",rh->Offset);
+	printf("Offset:\t%04x (%u)\n",rh->Offset,rh->Offset);
 	printf("Length:\t%04x (%u)\n",rh->Length,rh->Length);
-	return rh->Length+6;
+	switch(rh->Load_type)
+	{
+		case 0:
+			dst=cs;
+			break;
+		case 1:
+			dst=ds;
+			break;
+		default:
+			fprintf(stderr,"** ERROR ** Unknown load type %x\n",rh->Load_type);
+			break;
+	}
+	if(dst)
+		memcpy(dst+rh->Offset,rh->data,rh->Length);
+
+	return rh->Length+5;
 }
 
 int main(int argc, char *argv[])
@@ -126,6 +143,7 @@ int main(int argc, char *argv[])
 	ssize_t fl;
 	uint32_t bpos=0;
 	char *src=NULL, *cs=NULL, *ds=NULL;
+	struct load_hdr_record *h;
 	if(argc!=4)
 		usage(argv[0],EXIT_FAILURE);
 	fl=file2lbuf(argv[1],&src);
@@ -141,19 +159,35 @@ int main(int argc, char *argv[])
 		fprintf(stderr,"Missing SOH\n");
 		goto eofunc;
 	}
-	disp_main_header((struct load_hdr_record *)(src+1));
-	bpos=1+sizeof(load_hdr_record);
+	h=(struct load_hdr_record *)(src+1);
+	disp_main_header(h);
+
+	cs=calloc(h->Code_size,1);
+	ds=calloc(h->Init_data_size,1);
+
+	bpos=1+sizeof(struct load_hdr_record);
+
 	while(bpos<fl)
 	{
 		if(src[bpos]!=2)
 		{
-			fprintf(stderr,"Missing STX\n");
+			fprintf(stderr,"Missing STX at %x (%u)\n",bpos,bpos);
 			break;
 		}
 		bpos++;
-		bpos+=disp_record_header((struct load_data_record *rh)(src+bpos));
+		bpos+=load_record_header((struct load_data_record *)(src+bpos),cs,ds);
 	}
 
+	if(buf2file(cs,argv[2],h->Code_size,O_CREAT | O_EXCL | O_WRONLY,0644))
+	{
+		fprintf(stderr,"Error writing code segment to %s\n",argv[2]);
+		rv=2;
+	}
+	if(buf2file(ds,argv[3],h->Init_data_size,O_CREAT | O_EXCL | O_WRONLY,0644))
+	{
+		fprintf(stderr,"Error writing data segment to %s\n",argv[3]);
+		rv=3;
+	}
 eofunc:
 	free(src); free(cs); free(ds);
 	return rv;
