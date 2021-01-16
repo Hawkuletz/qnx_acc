@@ -7,10 +7,15 @@ Contents:
     qnx_acc.c   - Image file and filesystem access functions
     qdump.c     - Filesystem extract tool
 
-Use 'make' to build the tool
+	qobj.c		- QNX binary extract tool (extract code and data segments)
+	qnx_file.h	- QNX executable (binary) header structures
 
-Usage: 
-./qdump <disk_image> {-d|-x|-r} path [-a] [-o offset] [-l local_path]
+Use 'make' to build the tools
+
+Usage:
+qobj <qnx_binary> <code_out> <data_out>
+
+qdump <disk_image> {-d|-x|-r} path [-a] [-o offset] [-l local_path]
     -d  list directory at path (must be directory)
     -x  extract file (or directory contents, recursive) from path
     -r  read (dump) file to stdout
